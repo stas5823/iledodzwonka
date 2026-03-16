@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ile do dzwonka?</title>
+  <!-- Czcionka Nunito pobierana z Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Resetowanie domyślnych marginesów i wyrównanie zawartości do środka ekranu */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #fff; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    /* Przycisk powrotu do strony głównej – lewy górny róg */
+    #back {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      font-size: 26px;
+      font-weight: 400;
+      color: #ccc;
+      text-decoration: none;
+    }
+    #back:hover { color: #999; }
+
+    /* Przycisk pełnego ekranu – prawy górny róg */
+    #fs-btn {
+      position: fixed;
+      top: 28px;
+      right: 32px;
+      font-size: 22px;
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      line-height: 1;
+    }
+    #fs-btn:hover { color: #999; }
+
+    /* Data nad zegarem */
+    #date {
+      font-size: clamp(16px, 2.8vw, 24px);
+      font-weight: 400;
+      color: #bbb;
+      margin-bottom: 4px;
+    }
+
+    /* Wrapper dla godzin i sekund – wyświetlane obok siebie */
+    #clock-wrap {
+      display: flex;
+      align-items: baseline;
+      line-height: 1;
+      margin-bottom: 22px;
+    }
+
+    /* Duży zegar HH:MM */
+    #clock-hm {
+      font-size: clamp(80px, 20vw, 148px);
+      font-weight: 300;
+      letter-spacing: -3px;
+      color: #111;
+      line-height: 1;
+    }
+
+    /* Sekundy obok zegara – mniejsze i szare */
+    #clock-s {
+      font-size: clamp(36px, 9vw, 66px);
+      font-weight: 300;
+      color: #ccc;
+      letter-spacing: -1px;
+      line-height: 1;
+      margin-left: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* Etykieta "Do HH:MM" pokazująca cel odliczania */
+    #target {
+      font-size: clamp(16px, 2.8vw, 24px);
+      font-weight: 400;
+      color: #aaa;
+      margin-bottom: 4px;
+      min-height: 1.2em;
+    }
+
+    /* Główny odliczający licznik */
+    #countdown {
+      font-size: clamp(60px, 15vw, 110px);
+      font-weight: 500;
+      letter-spacing: -2px;
+      color: #222;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Przycisk powrotu do strony głównej -->
+<a id="back" href="index.php">← Powrót</a>
+
+<!-- Przycisk pełnego ekranu -->
+<button id="fs-btn" title="Pełny ekran">⛶</button>
+
+<!-- Data -->
+<div id="date"></div>
+
+<!-- Zegar -->
+<div id="clock-wrap">
+  <span id="clock-hm">--:--</span><span id="clock-s">:--</span>
+</div>
+
+<!-- Cel odliczania (np. "Do 08:45") -->
+<div id="target"></div>
+
+<!-- Główny licznik odliczający czas -->
+<div id="countdown">--:--</div>
+
+<script>
+  // Polskie nazwy dni tygodnia i miesięcy (do wyświetlenia daty)
+  const DAYS   = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+  const MONTHS = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+
+  // Plan lekcji i przerw – czas podany w minutach od północy (np. 480 = 8:00)
+  // Aby dostosować do swojego planu, zmień wartości start i end poniżej.
+  const PLAN = [
+    { type:'lesson', start:480,  end:525  },  // lekcja  8:00 –  8:45
+    { type:'break',  start:525,  end:535  },  // przerwa 8:45 –  8:55
+    { type:'lesson', start:535,  end:580  },  // lekcja  8:55 –  9:40
+    { type:'break',  start:580,  end:590  },  // przerwa 9:40 –  9:50
+    { type:'lesson', start:590,  end:635  },  // lekcja  9:50 – 10:35
+    { type:'break',  start:635,  end:645  },  // przerwa 10:35 – 10:45
+    { type:'lesson', start:645,  end:690  },  // lekcja  10:45 – 11:30
+    { type:'break',  start:690,  end:700  },  // przerwa 11:30 – 11:40
+    { type:'lesson', start:700,  end:745  },  // lekcja  11:40 – 12:25
+    { type:'break',  start:745,  end:765  },  // przerwa 12:25 – 12:45
+    { type:'lesson', start:765,  end:810  },  // lekcja  12:45 – 13:30
+    { type:'break',  start:810,  end:830  },  // przerwa 13:30 – 13:50
+    { type:'lesson', start:830,  end:875  },  // lekcja  13:50 – 14:35
+    { type:'break',  start:875,  end:885  },  // przerwa 14:35 – 14:45
+    { type:'lesson', start:885,  end:930  },  // lekcja  14:45 – 15:30
+    { type:'break',  start:930,  end:940  },  // przerwa 15:30 – 15:40
+    { type:'lesson', start:940,  end:985  },  // lekcja  15:40 – 16:25
+    { type:'break',  start:985,  end:995  },  // przerwa 16:25 – 16:35
+    { type:'lesson', start:995,  end:1040 },  // lekcja  16:35 – 17:20
+  ].map(s => ({ ...s, startS: s.start*60, endS: s.end*60 })); // przeliczenie minut na sekundy
+
+  // Pierwsza i ostatnia sekunda dnia szkolnego
+  const FIRST_S = PLAN[0].startS;
+  const LAST_S  = PLAN[PLAN.length-1].endS;
+
+  // Pomocnicza funkcja: dopełnia liczbę zerami (np. 5 → "05")
+  const pad = n => String(n).padStart(2,'0');
+
+  // Formatowanie czasu w formacie GG:MM:SS (używane gdy czekamy na następny dzień)
+  function fmtHMS(ms) {
+    const t = Math.max(0, Math.floor(ms/1000));
+    return `${pad(Math.floor(t/3600))}:${pad(Math.floor(t/60)%60)}:${pad(t%60)}`;
+  }
+
+  // Formatowanie czasu w formacie MM:SS (używane podczas lekcji i przerw)
+  function fmtMS(ms) {
+    const t = Math.max(0, Math.floor(ms/1000));
+    return `${pad(Math.floor(t/60))}:${pad(t%60)}`;
+  }
+
+  // Generuje etykietę "Do GG:MM" na podstawie czasu w sekundach
+  function fmtTime(s) {
+    return `Do ${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}`;
+  }
+
+  // Oblicza ile milisekund zostało do godziny targetS następnego dnia szkolnego
+  // (pomija weekendy – po piątku skacze do poniedziałku)
+  function nextSchoolDay(now, targetS) {
+    const day = now.getDay();
+    const add = day===5 ? 3 : day===6 ? 2 : 1; // piątek +3, sobota +2, inne +1
+    const d = new Date(now);
+    d.setDate(d.getDate()+add);
+    d.setHours(Math.floor(targetS/3600), Math.floor((targetS%3600)/60), targetS%60, 0);
+    return d - now;
+  }
+
+  // Główna funkcja odświeżana co sekundę
+  function update() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const nowS = h*3600 + m*60 + s; // aktualny czas w sekundach od północy
+    const isWd = now.getDay() >= 1 && now.getDay() <= 5; // czy dzisiaj jest dzień roboczy
+
+    // Aktualizacja daty i zegara
+    document.getElementById('date').textContent =
+      `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]}`;
+    document.getElementById('clock-hm').textContent = `${pad(h)}:${pad(m)}`;
+    document.getElementById('clock-s').textContent  = `:${pad(s)}`;
+
+    const tgt = document.getElementById('target');
+    const cd  = document.getElementById('countdown');
+
+    // Przed lekcjami lub w weekend – odliczaj do początku następnego dnia szkolnego
+    if (!isWd || nowS < FIRST_S) {
+      tgt.textContent = fmtTime(FIRST_S);
+      const ms = isWd ? (FIRST_S-nowS)*1000 : nextSchoolDay(now, FIRST_S);
+      cd.textContent = fmtHMS(ms);
+      return;
+    }
+
+    // Po ostatniej lekcji – odliczaj do początku następnego dnia szkolnego
+    if (nowS >= LAST_S) {
+      tgt.textContent = fmtTime(FIRST_S);
+      cd.textContent  = fmtHMS(nextSchoolDay(now, FIRST_S));
+      return;
+    }
+
+    // Znajdź aktualny blok (lekcja lub przerwa) w planie
+    const slot = PLAN.find(sl => nowS >= sl.startS && nowS < sl.endS);
+    if (!slot) return;
+
+    if (slot.type === 'lesson') {
+      // Podczas lekcji – odliczaj do jej końca (dzwonka)
+      tgt.textContent = fmtTime(slot.endS);
+      cd.textContent  = fmtMS((slot.endS - nowS)*1000);
+    } else {
+      // Podczas przerwy – odliczaj do początku następnej lekcji
+      const next = PLAN.find(sl => sl.type==='lesson' && sl.startS >= slot.endS);
+      tgt.textContent = fmtTime(next ? next.startS : slot.endS);
+      cd.textContent  = fmtMS(next ? (next.startS - nowS)*1000 : 0);
+    }
+  }
+
+  // Uruchom od razu i powtarzaj co 1000ms (1 sekunda)
+  update();
+  setInterval(update, 1000);
+
+  // Przycisk pełnego ekranu – działa po kliknięciu (wymóg przeglądarek)
+  document.getElementById('fs-btn').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  });
+</script>
+
+</body>
+</html>
